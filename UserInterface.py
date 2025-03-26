@@ -1,15 +1,7 @@
 import streamlit as st
 import pandas as pd
-import speech_recognition as sr
-from pydub import AudioSegment
-from pydub.playback import play
-import numpy as np
 from datetime import datetime
 from pathlib import Path
-import time
-import io
-
-# Ensure FFmpeg is installed for PyDub to work
 
 # File to store user data
 csv_file = "user_data.csv"
@@ -20,29 +12,6 @@ if "selected_discount" not in st.session_state:
     st.session_state.selected_discount = ""
 if "user_data" not in st.session_state:
     st.session_state.user_data = {}
-
-# Function to record and transcribe speech
-def record_audio(filename="output.wav", duration=5):
-    st.toast("🎙️ Recording... Speak now!")  
-    recognizer = sr.Recognizer()
-    mic = sr.Microphone()
-    
-    with mic as source:
-        recognizer.adjust_for_ambient_noise(source)
-        audio = recognizer.listen(source, timeout=duration)
-    
-    st.toast("✅ Recording Complete!")
-    
-    with st.spinner("Transcribing..."):
-        try:
-            text = recognizer.recognize_google(audio)
-            st.success(f"Recognized Name: {text}")
-            return text
-        except sr.UnknownValueError:
-            st.error("Could not understand the audio.")
-        except sr.RequestError:
-            st.error("Speech recognition service is unavailable.")
-    return ""
 
 # Streamlit UI
 st.title("🍽️ Welcome to Oceano Retreat")
@@ -76,21 +45,8 @@ if st.button("Save Special Offer"):
 st.session_state.user_data["Date & Time"] = current_datetime
 
 with st.expander("👤 Personal Details"):
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.session_state.user_data["Name"] = st.text_input("Enter Name", value=st.session_state.user_data.get("Name", ""))
-    with col2:
-        if st.button("🎤 Speak Name"):
-            st.session_state.user_data["Name"] = record_audio()
-    
-    for field in ["Mobile Number", "Aadhar Card Number", "Age", "Nationality", "Address"]:
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.session_state.user_data[field] = st.text_input(field, value=st.session_state.user_data.get(field, ""))
-        with col2:
-            if st.button(f"🎤 Speak {field}"):
-                st.session_state.user_data[field] = record_audio()
-
+    for field in ["Name", "Mobile Number", "Aadhar Card Number", "Age", "Nationality", "Address"]:
+        st.session_state.user_data[field] = st.text_input(field, value=st.session_state.user_data.get(field, ""))
     if st.button("Save Personal Details"):
         st.success("Personal details saved!")
 
