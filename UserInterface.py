@@ -1,12 +1,15 @@
 import streamlit as st
 import pandas as pd
 import speech_recognition as sr
-import sounddevice as sd
+from pydub import AudioSegment
+from pydub.playback import play
 import numpy as np
-import wavio
 from datetime import datetime
 from pathlib import Path
 import time
+import io
+
+# Ensure FFmpeg is installed for PyDub to work
 
 # File to store user data
 csv_file = "user_data.csv"
@@ -19,20 +22,16 @@ if "user_data" not in st.session_state:
     st.session_state.user_data = {}
 
 # Function to record and transcribe speech
-def record_audio(filename="output.wav", duration=5, samplerate=44100):
+def record_audio(filename="output.wav", duration=5):
     st.toast("🎙️ Recording... Speak now!")  
-    audio_data = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype=np.int16)
-    progress_bar = st.progress(0)
-    for i in range(100):
-        progress_bar.progress(i + 1)
-        time.sleep(duration / 100)
-    sd.wait()
-    wavio.write(filename, audio_data, samplerate, sampwidth=2)
-    st.toast("✅ Recording Complete!")
-
     recognizer = sr.Recognizer()
-    with sr.AudioFile(filename) as source:
-        audio = recognizer.record(source)
+    mic = sr.Microphone()
+    
+    with mic as source:
+        recognizer.adjust_for_ambient_noise(source)
+        audio = recognizer.listen(source, timeout=duration)
+    
+    st.toast("✅ Recording Complete!")
     
     with st.spinner("Transcribing..."):
         try:
@@ -121,4 +120,4 @@ if st.button("Save All Details"):
     df.to_csv(csv_path, mode='a', header=not csv_path.exists(), index=False)
     st.success(f"✅ Details saved successfully!")
 
-st.write("📂 Your details are securely stored in `user_data.csv`.")  
+st.write("📂 Your details are securely stored in `user_data.csv`.")
