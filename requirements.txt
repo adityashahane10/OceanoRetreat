@@ -1,0 +1,11 @@
+streamlit
+SpeechRecognition
+pyaudio
+numpy
+pandas
+openai
+transformers
+torch
+sentence-transformers
+pypdf
+dgl
