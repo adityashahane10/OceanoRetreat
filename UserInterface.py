@@ -4,49 +4,6 @@ import speech_recognition as sr
 from datetime import datetime
 from pathlib import Path
 import time
-# Add fancy background and custom styles
-st.markdown(
-    """
-    <style>
-        /* Background gradient */
-        .stApp {
-            background: linear-gradient(to right, #1e3c72, #2a5298);
-            color: white;
-        }
-        
-        /* Titles and subtitles */
-        h1, h2, h3, h4, h5, h6 {
-            color: #ffcc00;
-        }
-
-        /* Toast messages */
-        .stToast {
-            background-color: rgba(255, 255, 255, 0.2) !important;
-            color: white !important;
-        }
-
-        /* Buttons */
-        .stButton>button {
-            background-color: #ffcc00 !important;
-            color: black !important;
-            border-radius: 8px;
-            font-weight: bold;
-        }
-
-        /* Input fields */
-        input, textarea, select {
-            background-color: rgba(255, 255, 255, 0.2) !important;
-            color: white !important;
-        }
-
-        /* Special Offer section */
-        .stRadio label {
-            color: white !important;
-        }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 # File to store user data
 csv_file = "user_data.csv"
