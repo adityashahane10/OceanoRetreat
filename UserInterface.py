@@ -1,9 +1,7 @@
 import streamlit as st
 import pandas as pd
-import speech_recognition as sr
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-import time
 
 # File to store user data
 csv_file = "user_data.csv"
@@ -15,43 +13,16 @@ if "selected_discount" not in st.session_state:
 if "user_data" not in st.session_state:
     st.session_state.user_data = {}
 
-# Function to record and transcribe speech with a countdown timer
-def record_audio(filename="output.wav", duration=5):
-    st.toast("🎙️ Recording... Speak now!")  
-    recognizer = sr.Recognizer()
-    mic = sr.Microphone()
-
-    countdown_placeholder = st.empty()  # Placeholder for the countdown timer
-
-    with mic as source:
-        recognizer.adjust_for_ambient_noise(source)
-        start_time = time.time()
-
-        for remaining in range(duration, 0, -1):
-            countdown_placeholder.write(f"⏳ Recording... {remaining}s remaining")
-            time.sleep(1)
-
-        audio = recognizer.listen(source, timeout=duration)
-
-    countdown_placeholder.write("✅ Recording Complete!")
-
-    with st.spinner("Transcribing..."):
-        try:
-            text = recognizer.recognize_google(audio)
-            st.success(f"Recognized Name: {text}")
-            return text
-        except sr.UnknownValueError:
-            st.error("Could not understand the audio.")
-        except sr.RequestError:
-            st.error("Speech recognition service is unavailable.")
-    return ""
+# Function to get IST time
+def get_ist_time():
+    return (datetime.utcnow() + timedelta(hours=5, minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
 
 # Streamlit UI
 st.title("🍽️ Welcome to Oceano Retreat")
 st.subheader("Fill in your details:")
 
 # Show Date & Time
-current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+current_datetime = get_ist_time()
 st.write(f"📅 Date & Time: {current_datetime}")
 
 # Load existing data
@@ -78,21 +49,9 @@ if st.button("Save Special Offer"):
 st.session_state.user_data["Date & Time"] = current_datetime
 
 with st.expander("👤 Personal Details"):
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.session_state.user_data["Name"] = st.text_input("Enter Name", value=st.session_state.user_data.get("Name", ""))
-    with col2:
-        if st.button("🎤 Speak Name"):
-            st.session_state.user_data["Name"] = record_audio()
-
-    for field in ["Mobile Number", "Aadhar Card Number", "Age", "Nationality", "Address"]:
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.session_state.user_data[field] = st.text_input(field, value=st.session_state.user_data.get(field, ""))
-        with col2:
-            if st.button(f"🎤 Speak {field}"):
-                st.session_state.user_data[field] = record_audio()
-
+    for field in ["Name", "Mobile Number", "Aadhar Card Number", "Age", "Nationality", "Address"]:
+        st.session_state.user_data[field] = st.text_input(field, value=st.session_state.user_data.get(field, ""))
+    
     if st.button("Save Personal Details"):
         st.success("Personal details saved!")
 
