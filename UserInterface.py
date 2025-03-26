@@ -3,6 +3,9 @@ import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
 
+
+# Set custom page title and favicon (removes Streamlit logo)
+st.set_page_config(page_title="Oceano Retreat", page_icon="🏨", layout="centered")
 # File to store user data
 csv_file = "user_data.csv"
 csv_path = Path(csv_file)
