@@ -1,14 +1,19 @@
 import streamlit as st
 import pandas as pd
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
-from pathlib import Path
 
-
-# Set custom page title and favicon (removes Streamlit logo)
+# Set custom page title and favicon
 st.set_page_config(page_title="Oceano Retreat", page_icon="🏨", layout="centered")
-# File to store user data
-csv_file = "user_data.csv"
-csv_path = Path(csv_file)
+
+# Google Drive Authentication
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+credentials = ServiceAccountCredentials.from_json_keyfile_name("service_account.json", scope)
+client = gspread.authorize(credentials)
+
+# Open Google Sheet
+sheet = client.open("Oceano_Retreat_Data").sheet1  # Change to your sheet name
 
 # Initialize session state
 if "selected_discount" not in st.session_state:
@@ -16,7 +21,7 @@ if "selected_discount" not in st.session_state:
 if "user_data" not in st.session_state:
     st.session_state.user_data = {}
 
-# Get current time in IST
+# Get current IST time
 current_datetime = datetime.utcnow() + timedelta(hours=5, minutes=30)
 formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -28,19 +33,13 @@ st.subheader("Fill in your details:")
 st.write(f"📅 Date & Time: {formatted_datetime} (IST)")
 
 # Load existing data
-existing_df = pd.read_csv(csv_path) if csv_path.exists() else pd.DataFrame(columns=[
-    "Date & Time", "Name", "Discount Applied", "Mobile Number", "Aadhar Card Number",
-    "Age", "Nationality", "Address", "Check-in Date", "Check-out Date",
-    "Room Number", "Room Type", "Room Rent", "Total Stay", "Total Bill"
-])
+existing_data = sheet.get_all_records()
+existing_df = pd.DataFrame(existing_data)
 
 # Special Offers
 st.subheader("🎉 Special Offers")
 discount_options = ["5% Discount", "10% Discount", "15% Discount", "Free Drink", "Free Dessert", "VIP Lounge Access"]
-st.session_state.selected_discount = st.radio(
-    "Select your reward:", discount_options,
-    index=discount_options.index(st.session_state.selected_discount) if st.session_state.selected_discount in discount_options else 0
-)
+st.session_state.selected_discount = st.radio("Select your reward:", discount_options)
 st.write(f"✅ Selected Discount: **{st.session_state.selected_discount}**")
 st.session_state.user_data["Discount Applied"] = st.session_state.selected_discount
 
@@ -60,13 +59,13 @@ with st.expander("👤 Personal Details"):
 with st.expander("🏨 Stay Details"):
     col1, col2 = st.columns(2)
     with col1:
-        st.session_state.user_data["Check-in Date"] = st.date_input("Check-in Date", value=st.session_state.user_data.get("Check-in Date", datetime.today()))
+        st.session_state.user_data["Check-in Date"] = st.date_input("Check-in Date", value=datetime.today())
         st.session_state.user_data["Room Number"] = st.text_input("Room Number", value=st.session_state.user_data.get("Room Number", ""))
     with col2:
-        st.session_state.user_data["Check-out Date"] = st.date_input("Check-out Date", value=st.session_state.user_data.get("Check-out Date", datetime.today()))
-        st.session_state.user_data["Room Type"] = st.selectbox("Room Type", ["Single", "Double", "Suite"], index=["Single", "Double", "Suite"].index(st.session_state.user_data.get("Room Type", "Single")))
+        st.session_state.user_data["Check-out Date"] = st.date_input("Check-out Date", value=datetime.today())
+        st.session_state.user_data["Room Type"] = st.selectbox("Room Type", ["Single", "Double", "Suite"], index=0)
 
-    st.session_state.user_data["Room Rent"] = st.number_input("Room Rent (per night)", min_value=0.0, step=0.1, value=st.session_state.user_data.get("Room Rent", 0.0))
+    st.session_state.user_data["Room Rent"] = st.number_input("Room Rent (per night)", min_value=0.0, step=0.1)
     st.session_state.user_data["Total Stay"] = (st.session_state.user_data["Check-out Date"] - st.session_state.user_data["Check-in Date"]).days
     discount_factor = {"5% Discount": 0.95, "10% Discount": 0.90, "15% Discount": 0.85}.get(st.session_state.selected_discount, 1.0)
     st.session_state.user_data["Total Bill"] = st.session_state.user_data["Total Stay"] * st.session_state.user_data["Room Rent"] * discount_factor
@@ -77,10 +76,8 @@ with st.expander("🏨 Stay Details"):
     if st.button("Save Stay Details"):
         st.success("Stay details saved!")
 
-# Save to CSV
+# Save to Google Sheets
 if st.button("Save All Details"):
-    df = pd.DataFrame([st.session_state.user_data])
-    df.to_csv(csv_path, mode='a', header=not csv_path.exists(), index=False)
-    st.success(f"✅ Details saved successfully!")
-
-st.write("📂 Your details are securely stored in `user_data.csv`.")
+    row_data = list(st.session_state.user_data.values())
+    sheet.append_row(row_data)
+    st.success(f"✅ Details saved successfully to Google Drive!")
