@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 # File to store user data
@@ -13,13 +13,16 @@ if "selected_discount" not in st.session_state:
 if "user_data" not in st.session_state:
     st.session_state.user_data = {}
 
+# Get current time in IST
+current_datetime = datetime.utcnow() + timedelta(hours=5, minutes=30)
+formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
+
 # Streamlit UI
 st.title("🍽️ Welcome to Oceano Retreat")
 st.subheader("Fill in your details:")
 
 # Show Date & Time
-current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-st.write(f"📅 Date & Time: {current_datetime}")
+st.write(f"📅 Date & Time: {formatted_datetime} (IST)")
 
 # Load existing data
 existing_df = pd.read_csv(csv_path) if csv_path.exists() else pd.DataFrame(columns=[
@@ -42,11 +45,12 @@ if st.button("Save Special Offer"):
     st.success("Special offer saved!")
 
 # User details form
-st.session_state.user_data["Date & Time"] = current_datetime
+st.session_state.user_data["Date & Time"] = formatted_datetime
 
 with st.expander("👤 Personal Details"):
     for field in ["Name", "Mobile Number", "Aadhar Card Number", "Age", "Nationality", "Address"]:
         st.session_state.user_data[field] = st.text_input(field, value=st.session_state.user_data.get(field, ""))
+
     if st.button("Save Personal Details"):
         st.success("Personal details saved!")
 
