@@ -47,4 +47,5 @@ urllib3==2.3.0
 watchdog==6.0.0
 wavio==0.0.9
 st-gsheets-connection==0.1.0
-
+gspread==6.2.1                   
+google-auth>=2.29.0 
