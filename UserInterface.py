@@ -1,143 +1,122 @@
-# streamlit_app.py
-import os, datetime, numbers, numpy as np, pandas as pd
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
-import gspread
-from google.oauth2.service_account import Credentials
+import pandas as pd
+import speech_recognition as sr
+import sounddevice as sd
+import numpy as np
+import datetime
+import wavio
+import os
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 1 · CONFIG & CONNECTIONS
-# ─────────────────────────────────────────────────────────────────────────────
-CSV_FILE = "/Users/adityahemantshahane/Desktop/codes/user_data.csv"
+# File to store user data
+csv_file = "/Users/adityahemantshahane/Desktop/codes/user_data.csv"
 
-svc_info = st.secrets["connections"]["gsheets"]         # from secrets.toml
-SPREADSHEET_URL = svc_info["spreadsheet"]
-
-@st.cache_resource(show_spinner=False)
-def _gspread_client():
-    scopes = ["https://www.googleapis.com/auth/spreadsheets",
-              "https://www.googleapis.com/auth/drive"]
-    return gspread.authorize(
-        Credentials.from_service_account_info(svc_info, scopes=scopes)
-    )
-
-gclient     = _gspread_client()
-worksheet   = gclient.open_by_url(SPREADSHEET_URL).sheet1          # first tab
-conn_reader = st.connection("gsheets", type=GSheetsConnection)     # read helper
-
-# Column order used everywhere
-expected_cols = ["Date & Time", "Name", "Mobile Number",
-                 "Aadhar Card Number", "Age", "Nationality", "Address",
-                 "Check-in Date", "Check-out Date", "Room Number", "Room Type",
-                 "Room Rent", "Total Stay", "Total Bill"]
-
-# If sheet is empty → create header row once
-if not worksheet.get_all_values():
-    worksheet.append_row(expected_cols)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 2 · SESSION DEFAULTS
-# ─────────────────────────────────────────────────────────────────────────────
+# Initialize session state for discount selection
+if "selected_discount" not in st.session_state:
+    st.session_state.selected_discount = ""
 if "user_data" not in st.session_state:
     st.session_state.user_data = {}
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3 · UTILITY – convert cells to JSON-safe values
-# ─────────────────────────────────────────────────────────────────────────────
-def to_sheet(v):
-    if pd.isna(v):
+# Function to record and transcribe speech
+def record_audio(filename="output.wav", duration=5, samplerate=44100):
+    st.write("🎙️ Recording... Speak now!")
+    audio_data = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype=np.int16)
+    progress_bar = st.progress(0)
+    for i in range(100):
+        progress_bar.progress(i + 1)
+        sd.sleep(int(duration * 10))
+    sd.wait()
+    wavio.write(filename, audio_data, samplerate, sampwidth=2)
+    st.write("✅ Recording Complete!")
+    recognizer = sr.Recognizer()
+    with sr.AudioFile(filename) as source:
+        audio = recognizer.record(source)
+    try:
+        text = recognizer.recognize_google(audio)
+        st.success(f"Recognized Name: {text}")
+        return text
+    except sr.UnknownValueError:
+        st.error("Could not understand the audio.")
         return ""
-    if isinstance(v, (datetime.date, datetime.datetime, pd.Timestamp)):
-        return v.strftime("%Y-%m-%d")
-    if isinstance(v, (numbers.Integral, np.integer)):
-        return int(v)
-    if isinstance(v, (numbers.Real, np.floating)):
-        return float(v)
-    return str(v)
+    except sr.RequestError:
+        st.error("Speech recognition service is unavailable.")
+        return ""
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 4 · UI
-# ─────────────────────────────────────────────────────────────────────────────
+# Streamlit UI
 st.title("🍽️ Welcome to Oceano Retreat")
+st.subheader("Fill in your details:")
 
-now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-st.write(f"📅 **{now_str}**")
+# Show Date & Time
+current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+st.write(f"📅 Date & Time: {current_datetime}")
 
-# 👤 Personal details
-st.session_state.user_data["Date & Time"] = now_str
-with st.expander("👤 Personal Details", expanded=True):
-    for fld, key in [("Name", "Name"),
-                     ("Mobile Number", "Mobile Number"),
-                     ("Aadhar Card Number", "Aadhar Card Number"),
-                     ("Age", "Age"),
-                     ("Nationality", "Nationality"),
-                     ("Address", "Address")]:
-        st.session_state.user_data[key] = st.text_input(
-            fld, st.session_state.user_data.get(key, "")
-        )
+# Load existing data
+if os.path.exists(csv_file):
+    existing_df = pd.read_csv(csv_file)
+else:
+    existing_df = pd.DataFrame(columns=["Date & Time", "Name", "Discount Applied", "Mobile Number", "Aadhar Card Number", "Age", "Nationality", "Address", "Check-in Date", "Check-out Date", "Room Number", "Room Type", "Room Rent", "Total Stay", "Total Bill"])
 
-# 🏨 Stay details
+# Ensure necessary columns exist
+for col in ["Date & Time", "Name", "Discount Applied", "Mobile Number", "Aadhar Card Number", "Age", "Nationality", "Address", "Check-in Date", "Check-out Date", "Room Number", "Room Type", "Room Rent", "Total Stay", "Total Bill"]:
+    if col not in existing_df.columns:
+        existing_df[col] = ""
+
+# Special Offers (Discount Selection First)
+st.subheader("🎉 Special Offers")
+discount_options = ["5% Discount", "10% Discount", "15% Discount", "Free Drink", "Free Dessert", "VIP Lounge Access"]
+st.session_state.selected_discount = st.radio("Select your reward:", discount_options, index=discount_options.index(st.session_state.selected_discount) if st.session_state.selected_discount in discount_options else 0)
+st.write(f"✅ Selected Discount: **{st.session_state.selected_discount}**")
+st.session_state.user_data["Discount Applied"] = st.session_state.selected_discount
+if st.button("Save Special Offer"):
+    st.success("Special offer saved!")
+
+# User details form
+st.session_state.user_data["Date & Time"] = current_datetime
+
+with st.expander("👤 Personal Details"):
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.session_state.user_data["Name"] = st.text_input("Enter Name", value=st.session_state.user_data.get("Name", ""))
+    with col2:
+        if st.button("🎤 Speak Name"):
+            st.session_state.user_data["Name"] = record_audio()
+    
+    fields = ["Mobile Number", "Aadhar Card Number", "Age", "Nationality", "Address"]
+    for field in fields:
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.session_state.user_data[field] = st.text_input(field, value=st.session_state.user_data.get(field, ""))
+        with col2:
+            if st.button(f"🎤 Speak {field}"):
+                st.session_state.user_data[field] = record_audio()
+    if st.button("Save Personal Details"):
+        st.success("Personal details saved!")
+
 with st.expander("🏨 Stay Details"):
-    c1, c2 = st.columns(2)
-    with c1:
-        st.session_state.user_data["Check-in Date"] = st.date_input(
-            "Check-in", st.session_state.user_data.get("Check-in Date",
-                                                       datetime.date.today()))
-        st.session_state.user_data["Room Number"] = st.text_input(
-            "Room Number", st.session_state.user_data.get("Room Number", ""))
-    with c2:
-        st.session_state.user_data["Check-out Date"] = st.date_input(
-            "Check-out", st.session_state.user_data.get("Check-out Date",
-                                                        datetime.date.today()))
-        st.session_state.user_data["Room Type"] = st.selectbox(
-            "Room Type", ["Single", "Double", "Suite"],
-            index=["Single", "Double", "Suite"]
-                .index(st.session_state.user_data.get("Room Type", "Single"))
-        )
+    col1, col2 = st.columns(2)
+    with col1:
+        st.session_state.user_data["Check-in Date"] = st.date_input("Check-in Date", value=st.session_state.user_data.get("Check-in Date", datetime.date.today()))
+        st.session_state.user_data["Room Number"] = st.text_input("Room Number", value=st.session_state.user_data.get("Room Number", ""))
+    with col2:
+        st.session_state.user_data["Check-out Date"] = st.date_input("Check-out Date", value=st.session_state.user_data.get("Check-out Date", datetime.date.today()))
+        st.session_state.user_data["Room Type"] = st.selectbox("Room Type", ["Single", "Double", "Suite"], index=["Single", "Double", "Suite"].index(st.session_state.user_data.get("Room Type", "Single")))
+    
+    st.session_state.user_data["Room Rent"] = st.number_input("Room Rent (per night)", min_value=0.0, step=0.1, value=st.session_state.user_data.get("Room Rent", 0.0))
+    st.session_state.user_data["Total Stay"] = (st.session_state.user_data["Check-out Date"] - st.session_state.user_data["Check-in Date"]).days
+    discount_factor = {"5% Discount": 0.95, "10% Discount": 0.90, "15% Discount": 0.85}.get(st.session_state.selected_discount, 1.0)
+    st.session_state.user_data["Total Bill"] = st.session_state.user_data["Total Stay"] * st.session_state.user_data["Room Rent"] * discount_factor
+    
+    st.write(f"📌 Total Stay Duration: {st.session_state.user_data['Total Stay']} nights")
+    st.write(f"💰 Final Bill after Discount: ₹{st.session_state.user_data['Total Bill']}")
+    if st.button("Save Stay Details"):
+        st.success("Stay details saved!")
 
-    # Fixed room rent
-    st.session_state.user_data["Room Rent"] = 1000
+# Save to CSV
+if st.button("Save All Details"):
+    df = pd.DataFrame([st.session_state.user_data])
+    if os.path.exists(csv_file):
+        existing_df = pd.read_csv(csv_file)
+    df = pd.concat([existing_df, df], ignore_index=True)
+    df.to_csv(csv_file, index=False)
+    st.success(f"✅ Details saved successfully! {st.session_state.user_data['Discount Applied']} applied.")
 
-    # Stay length & bill
-    st.session_state.user_data["Total Stay"] = (
-        st.session_state.user_data["Check-out Date"] -
-        st.session_state.user_data["Check-in Date"]
-    ).days
-    st.session_state.user_data["Total Bill"] = (
-        st.session_state.user_data["Total Stay"] * 1000
-    )
-
-    st.info(f"Stay = {st.session_state.user_data['Total Stay']} nights  •  "
-            f"Bill = ₹{st.session_state.user_data['Total Bill']:.2f}")
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 5 · SAVE BUTTON
-# ─────────────────────────────────────────────────────────────────────────────
-if st.button("💾 Save All Details"):
-    row_df = pd.DataFrame([st.session_state.user_data])
-
-    # Local CSV backup
-    if os.path.exists(CSV_FILE):
-        pd.concat([pd.read_csv(CSV_FILE), row_df], ignore_index=True
-                  ).to_csv(CSV_FILE, index=False)
-    else:
-        row_df.to_csv(CSV_FILE, index=False)
-
-    # Append one row to the sheet
-    try:
-        worksheet.append_row(
-            [to_sheet(row_df.iloc[0][col]) for col in expected_cols],
-            value_input_option="USER_ENTERED"
-        )
-        st.success("✅ Saved to Google Sheets.")
-    except Exception as e:
-        st.error(f"❌ Google-Sheet write failed: {e}")
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 6 · OPTIONAL PREVIEW
-# ─────────────────────────────────────────────────────────────────────────────
-with st.expander("📊 View current sheet data"):
-    try:
-        st.dataframe(conn_reader.read())          # read-only
-    except Exception as e:
-        st.warning(f"Could not load sheet: {e}")
+st.write("📂 Your details will be securely stored in `user_data.csv`.")
